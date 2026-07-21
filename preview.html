@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WAYPOINT — Multi-UAV Mission Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:            #0A0F1A;
+    --panel:         #0F1729;
+    --panel-2:       #121D33;
+    --line:          #1E2C48;
+    --line-soft:     #16213A;
+    --text:          #E7EEFB;
+    --text-dim:      #7F91B3;
+    --text-faint:    #4C5A78;
+    --nominal:       #43E5C9;
+    --nominal-dim:   #1F6E63;
+    --warn:          #F3B34C;
+    --danger:        #FB5B4E;
+    --uav1: #43E5C9; --uav2:#F3B34C; --uav3:#8E9BFF; --uav4:#FB5B4E; --uav5:#5BD0FF; --uav6:#D0F35B; --uav7:#F35BC7; --uav8:#B98CFF;
+    --radius: 3px;
+    --mono: 'JetBrains Mono', 'SFMono-Regular', monospace;
+    --sans: 'Inter', -apple-system, sans-serif;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 700px at 15% -10%, rgba(67,229,201,0.06), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 100% 10%, rgba(142,155,255,0.05), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    min-height:100%;
+  }
+
+  ::selection{ background:rgba(67,229,201,0.25); }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 28px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg, rgba(15,23,41,0.9), rgba(15,23,41,0.4));
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:30px; height:30px; border-radius:50%;
+    border:1.5px solid var(--nominal);
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .brand-mark::before{
+    content:''; position:absolute; width:100%; height:1px; background:rgba(67,229,201,0.5);
+  }
+  .brand-mark::after{
+    content:''; position:absolute; width:1px; height:100%; background:rgba(67,229,201,0.5);
+  }
+  .brand-mark span{
+    width:5px; height:5px; border-radius:50%; background:var(--nominal); box-shadow:0 0 8px var(--nominal); z-index:1;
+  }
+  .brand-text .title{ font-family:var(--mono); font-weight:700; font-size:15px; letter-spacing:0.14em; }
+  .brand-text .sub{ font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:0.12em; margin-top:2px; }
+
+  .clock{ font-family:var(--mono); font-size:11px; color:var(--text-dim); letter-spacing:0.06em; text-align:right; }
+  .clock .status-line{ display:flex; align-items:center; gap:6px; justify-content:flex-end; margin-top:4px; }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--text-faint); }
+  .dot.live{ background:var(--nominal); box-shadow:0 0 6px var(--nominal); animation:pulse 1.6s ease-in-out infinite; }
+  .dot.busy{ background:var(--warn); box-shadow:0 0 6px var(--warn); animation:pulse 0.7s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+
+  /* ---------- layout ---------- */
+  .layout{
+    display:grid;
+    grid-template-columns: 300px 1fr 320px;
+    gap:1px;
+    background:var(--line);
+    min-height:calc(100vh - 68px);
+  }
+  .pane{ background:var(--bg); padding:20px; overflow:auto; }
+  .pane-left{ padding-top:22px; }
+  .pane-center{ padding:22px; display:flex; flex-direction:column; gap:16px; }
+  .pane-right{ padding-top:22px; }
+
+  .section-label{
+    font-family:var(--mono); font-size:10px; letter-spacing:0.16em; color:var(--text-faint);
+    text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{ content:''; flex:1; height:1px; background:var(--line-soft); }
+
+  /* ---------- controls ---------- */
+  .field{ margin-bottom:20px; }
+  .field label.flabel{
+    display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim);
+    letter-spacing:0.08em; text-transform:uppercase; margin-bottom:7px;
+  }
+  select, input[type=number]{
+    width:100%; background:var(--panel); border:1px solid var(--line); color:var(--text);
+    font-family:var(--sans); font-size:13px; padding:9px 10px; border-radius:var(--radius);
+    appearance:none; -webkit-appearance:none;
+  }
+  select{
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 16px) center, calc(100% - 11px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right:28px;
+  }
+  select:focus, input:focus{ outline:none; border-color:var(--nominal); box-shadow:0 0 0 1px rgba(67,229,201,0.35); }
+  .field .help{ font-size:11px; color:var(--text-faint); margin-top:6px; line-height:1.5; }
+
+  .uav-stepper{ display:flex; align-items:stretch; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--panel); }
+  .uav-stepper button{
+    width:38px; background:var(--panel-2); border:none; color:var(--text); cursor:pointer;
+    font-family:var(--mono); font-size:16px; transition:background 0.15s;
+  }
+  .uav-stepper button:hover{ background:#1a2842; }
+  .uav-stepper .count{ flex:1; text-align:center; font-family:var(--mono); font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:center; letter-spacing:0.05em; }
+
+  .checkrow{ display:flex; align-items:center; gap:9px; margin-bottom:12px; cursor:pointer; user-select:none; }
+  .checkrow input{ accent-color:var(--nominal); width:14px; height:14px; }
+  .checkrow span{ font-size:12.5px; color:var(--text-dim); }
+
+  .run-btn{
+    width:100%; padding:13px; margin-top:6px;
+    background:var(--nominal); color:#06251F; border:none; border-radius:var(--radius);
+    font-family:var(--mono); font-weight:700; font-size:12.5px; letter-spacing:0.12em;
+    text-transform:uppercase; cursor:pointer; transition:all 0.15s;
+    box-shadow:0 0 0 0 rgba(67,229,201,0.5);
+  }
+  .run-btn:hover{ background:#5AF0D6; box-shadow:0 0 22px rgba(67,229,201,0.35); }
+  .run-btn:disabled{ background:var(--line); color:var(--text-faint); cursor:not-allowed; box-shadow:none; }
+
+  /* mission log */
+  .log-box{
+    margin-top:22px; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    height:220px; overflow-y:auto; padding:10px 12px; font-family:var(--mono); font-size:10.5px;
+    color:var(--text-dim); line-height:1.65;
+  }
+  .log-box .l-uav{ color:var(--nominal); }
+  .log-box .l-warn{ color:var(--warn); }
+  .log-box .l-err{ color:var(--danger); }
+  .log-box::-webkit-scrollbar{ width:6px; }
+  .log-box::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
+
+  /* ---------- center: canvas ---------- */
+  .stage{
+    position:relative; align-self:center;
+    border:1px solid var(--line); border-radius:6px; background:#070B14;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.02);
+  }
+  .stage canvas{ display:block; border-radius:6px; }
+  .corner{ position:absolute; width:16px; height:16px; border-color:var(--nominal); opacity:0.55; }
+  .corner.tl{ top:-1px; left:-1px; border-top:2px solid; border-left:2px solid; }
+  .corner.tr{ top:-1px; right:-1px; border-top:2px solid; border-right:2px solid; }
+  .corner.bl{ bottom:-1px; left:-1px; border-bottom:2px solid; border-left:2px solid; }
+  .corner.br{ bottom:-1px; right:-1px; border-bottom:2px solid; border-right:2px solid; }
+
+  .hud-readout{
+    position:absolute; top:10px; left:10px; font-family:var(--mono); font-size:10px; color:var(--nominal);
+    background:rgba(7,11,20,0.72); border:1px solid var(--line-soft); padding:6px 9px; border-radius:2px;
+    letter-spacing:0.04em; pointer-events:none; line-height:1.6;
+  }
+  .hud-readout .dim{ color:var(--text-faint); }
+
+  .stage-toolbar{
+    display:flex; align-items:center; gap:14px; justify-content:center; flex-wrap:wrap;
+  }
+  .toolbtn{
+    background:var(--panel); border:1px solid var(--line); color:var(--text-dim);
+    font-family:var(--mono); font-size:10.5px; letter-spacing:0.08em; text-transform:uppercase;
+    padding:8px 14px; border-radius:var(--radius); cursor:pointer; transition:all 0.15s;
+  }
+  .toolbtn:hover{ color:var(--text); border-color:var(--nominal); }
+  .toolbtn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .speed-wrap{ display:flex; align-items:center; gap:8px; }
+  .speed-wrap span{ font-family:var(--mono); font-size:10px; color:var(--text-faint); }
+  input[type=range]{ accent-color:var(--nominal); width:110px; }
+
+  .legend{
+    display:flex; gap:18px; justify-content:center; flex-wrap:wrap;
+    font-family:var(--mono); font-size:10px; color:var(--text-faint); letter-spacing:0.04em;
+  }
+  .legend .li{ display:flex; align-items:center; gap:6px; }
+  .legend .sw{ width:9px; height:9px; border-radius:2px; }
+
+  /* ---------- right: results ---------- */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; margin-bottom:22px; }
+  .stat{ background:var(--panel); padding:12px 14px; }
+  .stat .k{ font-family:var(--mono); font-size:9px; color:var(--text-faint); letter-spacing:0.1em; text-transform:uppercase; }
+  .stat .v{ font-family:var(--mono); font-size:17px; font-weight:600; color:var(--text); margin-top:5px; }
+  .stat .v.nominal{ color:var(--nominal); }
+  .stat .v.warn{ color:var(--warn); }
+
+  table.results{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:11px; margin-bottom:18px; }
+  table.results th{
+    text-align:left; font-size:9px; letter-spacing:0.08em; color:var(--text-faint); text-transform:uppercase;
+    padding:6px 8px; border-bottom:1px solid var(--line);
+  }
+  table.results td{ padding:7px 8px; border-bottom:1px solid var(--line-soft); color:var(--text-dim); }
+  table.results tr:last-child td{ border-bottom:none; }
+  .uav-chip{ display:inline-flex; align-items:center; gap:6px; color:var(--text); }
+  .uav-chip .dot2{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+
+  .validation{
+    margin-top:8px; padding:10px 12px; border-radius:var(--radius); border:1px solid var(--line);
+    font-family:var(--mono); font-size:11px; display:flex; align-items:center; gap:9px;
+  }
+  .validation.pass{ border-color:var(--nominal-dim); color:var(--nominal); background:rgba(67,229,201,0.06); }
+  .validation.fail{ border-color:#5c2a25; color:var(--danger); background:rgba(251,91,78,0.06); }
+  .validation .b{ width:8px; height:8px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+  .empty-state{
+    color:var(--text-faint); font-size:12px; line-height:1.7; padding:20px 4px;
+  }
+  .empty-state b{ color:var(--text-dim); }
+
+  @media (max-width: 1100px){
+    .layout{ grid-template-columns: 1fr; }
+    .stage{ width:100% !important; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span></span></div>
+      <div class="brand-text">
+        <div class="title">WAYPOINT</div>
+        <div class="sub">MULTI-AGENT PATH PLANNER</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div id="clockTime">--:--:--</div>
+      <div class="status-line"><span class="dot live" id="statusDot"></span><span id="statusText">STANDBY</span></div>
+    </div>
+  </div>
+
+  <div class="layout">
+
+    <!-- LEFT: mission controls -->
+    <div class="pane pane-left">
+      <div class="section-label">Mission Setup</div>
+
+      <div class="field">
+        <label class="flabel">Planning Algorithm</label>
+        <select id="algoSelect">
+          <option value="astar">A* — length + hazard cost</option>
+          <option value="dijkstra">Dijkstra — cost only, no heuristic</option>
+          <option value="greedy">Greedy Best-First — heuristic only</option>
+          <option value="rrt">RRT — penalty-guided random tree</option>
+          <option value="qga">QGA — quantum genetic algorithm</option>
+           <option value="abc">ABC — artificial bee colony</option>
+        </select>
+        <div class="help" id="algoHelp">Balances distance travelled against every hazard penalty — the reference planner.</div>
+      </div>
+
+      <div class="field">
+        <label class="flabel">Environment</label>
+        <select id="envSelect">
+          <option value="open">Open Field — sparse, wide clearance</option>
+          <option value="scattered">Scattered — moderate clutter</option>
+          <option value="dense">Dense Cluster — tight obstacle field</option>
+          <option value="corridor">Corridor Maze — walled lanes</option>
+          <option value="random">Randomized — reroll every run</option>
+        </select>
+        <div class="help" id="envHelp">A handful of well-spaced obstacles — mostly open airspace.</div>
+      </div>
+
+      <div class="field">
+        <label class="flabel">Fleet Size</label>
+        <div class="uav-stepper">
+          <button id="uavMinus" type="button">−</button>
+          <div class="count" id="uavCount">3</div>
+          <button id="uavPlus" type="button">+</button>
+        </div>
+        <div class="help">Each UAV is planned in turn, then checked for mid-air conflicts against every UAV planned before it.</div>
+      </div>
+
+      <div class="section-label" style="margin-top:26px;">Display</div>
+      <label class="checkrow"><input type="checkbox" id="toggleZones" checked><span>Show hazard zones</span></label>
+      <label class="checkrow"><input type="checkbox" id="toggleGrid"><span>Show grid lines</span></label>
+      <label class="checkrow"><input type="checkbox" id="toggleTrail" checked><span>Show flight trail</span></label>
+
+      <button class="run-btn" id="runBtn" type="button">▶ Run Mission</button>
+
+      <div class="section-label" style="margin-top:24px;">Mission Log</div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+
+    <!-- CENTER: map + playback -->
+    <div class="pane pane-center">
+      <div class="section-label">Airspace — Live Plot</div>
+      <div class="stage" id="stage" style="width:640px;">
+        <canvas id="mapCanvas" width="640" height="640"></canvas>
+        <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+        <div class="hud-readout" id="hudReadout">
+          NEAREST HAZARD <span id="hudDist">—</span><br>
+          FRAME PENALTY <span id="hudPen">—</span><br>
+          CUM. PENALTY <span class="dim" id="hudCum">—</span>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="li"><span class="sw" style="background:#fff"></span>start</div>
+        <div class="li"><span class="sw" style="background:#fff; clip-path:polygon(50% 0,100% 100%,0 100%);"></span>goal</div>
+        <div class="li"><span class="sw" style="background:#1a2540; border:1px solid #33436b;"></span>obstacle</div>
+        <div class="li"><span class="sw" style="background:var(--warn)"></span>warning zone</div>
+        <div class="li"><span class="sw" style="background:var(--danger)"></span>danger zone</div>
+      </div>
+
+      <div class="stage-toolbar">
+        <button class="toolbtn" id="playBtn" disabled>▶ Replay</button>
+        <button class="toolbtn" id="pauseBtn" disabled>⏸ Pause</button>
+        <div class="speed-wrap"><span>SLOW</span><input type="range" id="speedRange" min="0.25" max="3" step="0.25" value="1"><span>FAST</span></div>
+      </div>
+
+      <canvas id="chartCanvas" width="640" height="150" style="width:640px; height:150px; border:1px solid var(--line); border-radius:4px; background:var(--panel);"></canvas>
+    </div>
+
+    <!-- RIGHT: results -->
+    <div class="pane pane-right">
+      <div class="section-label">Mission Results</div>
+      <div id="resultsWrap">
+        <div class="empty-state">No mission planned yet. Set your <b>algorithm</b>, <b>environment</b>, and <b>fleet size</b> on the left, then run the mission to see flight paths, per-UAV cost, and computation time here.</div>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================
+   CONFIG / CONSTANTS
+   ========================================================= */
+const GRID = 160;                 // grid resolution (cells per side)
+const CELL = 4;                   // pixels per cell (canvas is GRID*CELL)
+const CANVAS_SIZE = GRID * CELL;
+
+const PARAMS = {
+  dangerDist: 3, warningDist: 9, penaltyScale: 2.2, penaltyWeight: 0.6,
+  uavWarningDist: 8, uavPenaltyScale: 1.8, uavPenaltyWeight: 0.6, safeDist: 4,
+  boundaryDangerDist: 1, boundaryWarningDist: 3, boundaryPenaltyScale: 1, boundaryPenaltyWeight: 0.25,
+  minSep: 10,
+  interpStepsPerSeg: 8,
+  uniformSpeed: 1.5,
+  maxSweeps: 400,
+  maxRounds: 60,
+  // RRT
+  rrtStepSize: 5, rrtGoalRadius: 7, rrtMaxIter: 2500, rrtGoalBias: 0.1, rrtLambda: 10,
+  // QGA
+  qgaWaypoints: 5, qgaPopSize: 26, qgaMaxGen: 50, qgaRotAngle0: 0.05*Math.PI, qgaMutRate: 0.05,
+   abcColony: 15, abcWaypoints: 5, abcIterations: 60, abcLimit: 20, abcMutation: 50
+};
+
+const UAV_COLORS = ['--uav1','--uav2','--uav3','--uav4','--uav5','--uav6','--uav7','--uav8']
+  .map(v => getComputedStyle(document.documentElement).getPropertyValue(v).trim());
+
+const ALGO_HELP = {
+  astar: "Balances distance travelled against every hazard penalty — the reference planner.",
+  dijkstra: "Expands purely by cost-so-far, ignoring distance-to-goal. Explores more, but still hazard-aware.",
+  greedy: "Chases the goal directly using only the heuristic. Fast, but can cut closer to hazards than A*.",
+  rrt: "Grows a random tree toward the goal; every new branch must stay obstacle-free and safely clear of other UAVs, or it's discarded. Stochastic — paths vary run to run.",
+  qga: "Evolves a population of qubit-encoded candidate routes toward the goal using quantum rotation gates, mutation and elitism. Obstacle-free is required; UAV separation is only a soft steering term here.",
+   abc: "Artificial Bee Colony optimizer. Searches waypoint-based paths using employed, onlooker and scout bee phases while minimizing distance plus obstacle, UAV and boundary penalties."
+};
+const ENV_HELP = {
+  open: "A handful of well-spaced obstacles — mostly open airspace.",
+  scattered: "A moderate scatter of small-to-medium obstacles across the field.",
+  dense: "Many tightly packed obstacles — tests hazard-avoidance under pressure.",
+  corridor: "Obstacles arranged into walled lanes with narrow gaps — forces committed routing.",
+  random: "Obstacle count, size and layout are re-rolled on every run."
+};
+
+/* =========================================================
+   STATE
+   ========================================================= */
+let state = {
+  numUAVs: 3,
+  mask: null, distField: null, obstacles: [],
+  UAVs: [],           // {id,start,goal,path,color,length,timeMs,cost,waits}
+  computationTimeMs: 0,
+  validation: null,
+  animFrames: null,   // padded uniform-speed arrays per UAV
+  animLen: 0,
+  animIndex: 0,
+  animPlaying: false,
+  animRAF: null,
+  lastFrameTime: 0,
+  instantPenalty: [], cumPenalty: []
+};
+
+/* =========================================================
+   DOM
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const algoSelect = $('algoSelect'), envSelect = $('envSelect');
+const uavCountEl = $('uavCount'), uavMinus = $('uavMinus'), uavPlus = $('uavPlus');
+const runBtn = $('runBtn'), logBox = $('logBox');
+const mapCanvas = $('mapCanvas'), mctx = mapCanvas.getContext('2d');
+const chartCanvas = $('chartCanvas'), cctx = chartCanvas.getContext('2d');
+const hudDist = $('hudDist'), hudPen = $('hudPen'), hudCum = $('hudCum');
+const statusDot = $('statusDot'), statusText = $('statusText');
+const playBtn = $('playBtn'), pauseBtn = $('pauseBtn'), speedRange = $('speedRange');
+const toggleZones = $('toggleZones'), toggleGrid = $('toggleGrid'), toggleTrail = $('toggleTrail');
+const resultsWrap = $('resultsWrap');
+
+algoSelect.addEventListener('change', () => { $('algoHelp').textContent = ALGO_HELP[algoSelect.value]; });
+envSelect.addEventListener('change', () => { $('envHelp').textContent = ENV_HELP[envSelect.value]; });
+uavMinus.addEventListener('click', () => setUavCount(state.numUAVs - 1));
+uavPlus.addEventListener('click', () => setUavCount(state.numUAVs + 1));
+function setUavCount(n){ n = Math.max(1, Math.min(8, n)); state.numUAVs = n; uavCountEl.textContent = n; }
+
+[toggleZones, toggleGrid, toggleTrail].forEach(el => el.addEventListener('change', () => {
+  if (state.UAVs.length) drawStatic();
+}));
+
+/* clock */
+function tickClock(){
+  const d = new Date();
+  $('clockTime').textContent = d.toTimeString().slice(0,8) + ' UTC' + (-d.getTimezoneOffset()/60 >= 0 ? '+':'') + (-d.getTimezoneOffset()/60);
+}
+tickClock(); setInterval(tickClock, 1000);
+
+function setStatus(text, mode){
+  statusText.textContent = text;
+  statusDot.className = 'dot ' + (mode === 'busy' ? 'busy' : 'live');
+}
+
+function log(msg, cls){
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  logBox.appendChild(line);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+function clearLog(){ logBox.innerHTML = ''; }
+
+/* =========================================================
+   RNG / GRID HELPERS
+   ========================================================= */
+function randInt(min, max){ return Math.floor(Math.random() * (max - min + 1)) + min; }
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+function idx(x, y){ return y * GRID + x; }
+
+/* =========================================================
+   OBSTACLE GENERATION
+   ========================================================= */
+function rectOverlap(a, b, buf){
+  return !(a.x + a.w + buf < b.x || b.x + b.w + buf < a.x ||
+           a.y + a.h + buf < b.y || b.y + b.h + buf < a.y);
+}
+
+function genObstacles(env){
+  const obs = [];
+  const buf = 4;
+
+  function scatterSquares(count, minS, maxS){
+    let attempts = 0;
+    while (obs.length < count && attempts < 4000){
+      attempts++;
+      const s = randInt(minS, maxS);
+      const x = randInt(1, GRID - s - 1);
+      const y = randInt(1, GRID - s - 1);
+      const cand = { x, y, w: s, h: s };
+      if (!obs.some(o => rectOverlap(cand, o, buf))) obs.push(cand);
+    }
+  }
+
+  if (env === 'open'){
+    scatterSquares(4, 16, 30);
+  } else if (env === 'scattered'){
+    scatterSquares(11, 8, 20);
+  } else if (env === 'dense'){
+    scatterSquares(22, 6, 14);
+  } else if (env === 'random'){
+    scatterSquares(randInt(6, 20), 6, 24);
+  } else if (env === 'corridor'){
+    const rows = 4;
+    const rowH = 6;
+    for (let r = 1; r <= rows; r++){
+      const y = Math.round((GRID / (rows + 1)) * r) - rowH / 2;
+      const gapCount = randInt(2, 3);
+      const gapW = 14;
+      const gaps = [];
+      for (let g = 0; g < gapCount; g++) gaps.push(randInt(10, GRID - 10));
+      gaps.sort((a,b)=>a-b);
+      let cursor = 0;
+      for (let g = 0; g < gaps.length; g++){
+        const segEnd = clamp(gaps[g] - gapW/2, cursor, GRID);
+        if (segEnd - cursor > 4) obs.push({ x: cursor, y, w: segEnd - cursor, h: rowH });
+        cursor = gaps[g] + gapW/2;
+      }
+      if (GRID - cursor > 4) obs.push({ x: cursor, y, w: GRID - cursor, h: rowH });
+    }
+  }
+  return obs;
+}
+
+function rasterize(obstacles){
+  const mask = new Uint8Array(GRID * GRID);
+  for (const o of obstacles){
+    const x2 = Math.min(o.x + o.w, GRID - 1);
+    const y2 = Math.min(o.y + o.h, GRID - 1);
+    for (let y = Math.max(0,o.y); y <= y2; y++)
+      for (let x = Math.max(0,o.x); x <= x2; x++)
+        mask[idx(x,y)] = 1;
+  }
+  return mask;
+}
+
+function computeDistField(obstacles){
+  const field = new Float32Array(GRID * GRID).fill(Infinity);
+  if (!obstacles.length) return field;
+  for (let y = 0; y < GRID; y++){
+    for (let x = 0; x < GRID; x++){
+      let best = Infinity;
+      for (const o of obstacles){
+        const dx = Math.max(o.x - x, 0, x - (o.x + o.w));
+        const dy = Math.max(o.y - y, 0, y - (o.y + o.h));
+        const d = Math.sqrt(dx*dx + dy*dy);
+        if (d < best) best = d;
+      }
+      field[idx(x,y)] = best;
+    }
+  }
+  return field;
+}
+
+function distanceFromField(x, y, field){
+  const xi = clamp(Math.round(x), 0, GRID - 1);
+  const yi = clamp(Math.round(y), 0, GRID - 1);
+  return field[idx(xi, yi)];
+}
+
+function generateFreePosition(mask, used, minSep){
+  let attempts = 0;
+  while (attempts < 8000){
+    attempts++;
+    const x = randInt(1, GRID - 2), y = randInt(1, GRID - 2);
+    if (mask[idx(x,y)] === 1) continue;
+    let ok = true;
+    for (const p of used){
+      const d = Math.hypot(p[0]-x, p[1]-y);
+      if (d <= minSep){ ok = false; break; }
+    }
+    if (ok) return [x, y];
+  }
+  return [randInt(1,GRID-2), randInt(1,GRID-2)];
+}
+
+/* per-planning-call: distance to every already-committed UAV path */
+function computeUAVDistField(otherPaths){
+  const field = new Float32Array(GRID * GRID).fill(Infinity);
+  if (!otherPaths.length) return field;
+  for (let y = 0; y < GRID; y++){
+    for (let x = 0; x < GRID; x++){
+      let best = Infinity;
+      for (const path of otherPaths){
+        for (let s = 1; s < path.length; s++){
+          const p1 = path[s-1], p2 = path[s];
+          const vx = p2[0]-p1[0], vy = p2[1]-p1[1];
+          const segLenSq = vx*vx + vy*vy;
+          let px, py;
+          if (segLenSq < 1e-9){ px = p1[0]; py = p1[1]; }
+          else {
+            let t = ((x-p1[0])*vx + (y-p1[1])*vy) / segLenSq;
+            t = clamp(t, 0, 1);
+            px = p1[0] + t*vx; py = p1[1] + t*vy;
+          }
+          const d = Math.hypot(x-px, y-py);
+          if (d < best) best = d;
+        }
+      }
+      field[idx(x,y)] = best;
+    }
+  }
+  return field;
+}
+
+/* =========================================================
+   PENALTY FUNCTIONS
+   ========================================================= */
+function zonePenalty(d, danger, warning, scale){
+  if (d >= warning) return 0;
+  if (d >= danger) return (warning - d) / (warning - danger);
+  return Math.exp((danger - d) / scale);
+}
+function boundaryZonePenalty(d, bd, bw, bs){
+  if (d >= bw) return 0;
+  if (d >= bd) return (bw - d) / (bw - bd);
+  return Math.exp((bd - d) / bs);
+}
+function uavZonePenalty(d, safeDist, uavWarning, uavScale){
+  if (d >= uavWarning) return 0;
+  if (d >= safeDist) return (uavWarning - d) / (uavWarning - safeDist);
+  return Math.exp((safeDist - d) / uavScale);
+}
+
+/* =========================================================
+   PRIORITY QUEUE (binary min-heap)
+   ========================================================= */
+class MinHeap{
+  constructor(){ this.a = []; }
+  size(){ return this.a.length; }
+  push(node){
+    const a = this.a; a.push(node);
+    let i = a.length - 1;
+    while (i > 0){
+      const p = (i-1) >> 1;
+      if (a[p].p <= a[i].p) break;
+      [a[p], a[i]] = [a[i], a[p]]; i = p;
+    }
+  }
+  pop(){
+    const a = this.a;
+    const top = a[0];
+    const last = a.pop();
+    if (a.length){
+      a[0] = last;
+      let i = 0;
+      while (true){
+        let l = 2*i+1, r = 2*i+2, m = i;
+        if (l < a.length && a[l].p < a[m].p) m = l;
+        if (r < a.length && a[r].p < a[m].p) m = r;
+        if (m === i) break;
+        [a[m], a[i]] = [a[i], a[m]]; i = m;
+      }
+    }
+    return top;
+  }
+}
+
+/* =========================================================
+   A* / DIJKSTRA / GREEDY SEARCH
+   ========================================================= */
+const NBR = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+
+
+/* =========================================================
+   ARTIFICIAL BEE COLONY (ABC) PATH PLANNER
+   Waypoint encoding: [start, w1...wn, goal]
+   Inspired by the MATLAB ABC5UAV implementation:
+   - multiple food sources
+   - employed/onlooker/scout phases
+   - feasible obstacle-free best solution tracking
+   ========================================================= */
+function runABC(start, goal, mask, distField, uavDistField){
+  const dim = PARAMS.abcWaypoints * 2;
+  const colony = PARAMS.abcColony;
+  const maxIter = PARAMS.abcIterations;
+  const limit = PARAMS.abcLimit;
+  const mutation = PARAMS.abcMutation;
+
+  function randomCandidate(){
+    let x=[];
+    for(let i=0;i<dim;i++) x.push(Math.random()*(GRID-1));
+    return x;
+  }
+  function decode(v){
+    let p=[start];
+    for(let i=0;i<PARAMS.abcWaypoints;i++)
+      p.push([v[2*i],v[2*i+1]]);
+    p.push(goal);
+    return p;
+  }
+  function fitness(v){
+    const path=decode(v);
+    if(!isPathObstacleFree(path,mask)) return Infinity;
+    return fastPathCost(path,distField,uavDistField);
+  }
+  function copy(v){ return v.slice(); }
+
+  let foods=[];
+  for(let i=0;i<colony;i++){
+    let v=randomCandidate();
+    foods.push({v,fit:fitness(v),trial:0});
+  }
+
+  let best=foods[0];
+  for(const f of foods) if(f.fit<best.fit) best={v:copy(f.v),fit:f.fit};
+
+  for(let iter=0;iter<maxIter;iter++){
+    // employed bees
+    for(let i=0;i<colony;i++){
+      let k=Math.floor(Math.random()*colony);
+      while(k===i) k=Math.floor(Math.random()*colony);
+      let nv=copy(foods[i].v);
+      let d=Math.floor(Math.random()*dim);
+      nv[d]+= (Math.random()*2-1)*mutation*(foods[i].v[d]-foods[k].v[d])/Math.max(1,GRID);
+      nv[d]=clamp(nv[d],0,GRID-1);
+      let nf=fitness(nv);
+      if(nf<foods[i].fit){foods[i]={v:nv,fit:nf,trial:0};}
+      else foods[i].trial++;
+    }
+
+    // onlooker selection
+    let weights=foods.map(f=>1/(1+f.fit));
+    let sum=weights.reduce((a,b)=>a+(isFinite(b)?b:0),0);
+    for(let b=0;b<colony;b++){
+      let r=Math.random()*sum, chosen=0;
+      for(let i=0;i<colony;i++){ r-=weights[i]; if(r<=0){chosen=i;break;} }
+      let nv=copy(foods[chosen].v);
+      let d=Math.floor(Math.random()*dim);
+      nv[d]=clamp(nv[d]+(Math.random()*2-1)*mutation,0,GRID-1);
+      let nf=fitness(nv);
+      if(nf<foods[chosen].fit){foods[chosen]={v:nv,fit:nf,trial:0};}
+      else foods[chosen].trial++;
+    }
+
+    // scout bees
+    for(let i=0;i<colony;i++){
+      if(foods[i].trial>limit){
+        let nv=randomCandidate();
+        foods[i]={v:nv,fit:fitness(nv),trial:0};
+      }
+    }
+
+    for(const f of foods){
+      if(f.fit<best.fit) best={v:copy(f.v),fit:f.fit};
+    }
+  }
+
+  if(!isFinite(best.fit)) return null;
+  return {path:decode(best.v), fitness:best.fit};
+}
+
+function runSearch(algorithm, start, goal, mask, distField, uavDistField, otherPaths){
+  if (algorithm === 'rrt') return runRRT(start, goal, mask, distField, uavDistField);
+  if (algorithm === 'qga') return runQGA(start, goal, mask, distField, uavDistField);
+  if (algorithm === 'abc') return runABC(start, goal, mask, distField, uavDistField);
+
+  const N = GRID;
+  const gCost = new Float32Array(N*N).fill(Infinity);
+  const closed = new Uint8Array(N*N);
+  const parentX = new Int16Array(N*N).fill(-1);
+  const parentY = new Int16Array(N*N).fill(-1);
+
+  const h0 = Math.hypot(start[0]-goal[0], start[1]-goal[1]);
+  gCost[idx(start[0],start[1])] = 0;
+
+  const heap = new MinHeap();
+  heap.push({ x:start[0], y:start[1], p: (algorithm==='dijkstra'?0:h0) });
+
+  let goalReached = false;
+  let expansions = 0;
+  const maxExpansions = N*N;
+
+  while (heap.size() && expansions < maxExpansions){
+    expansions++;
+    const cur = heap.pop();
+    const cx = cur.x, cy = cur.y;
+    if (closed[idx(cx,cy)]) continue;
+    if (cx === goal[0] && cy === goal[1]){ goalReached = true; break; }
+    closed[idx(cx,cy)] = 1;
+
+    for (const [dx,dy] of NBR){
+      const nx = cx+dx, ny = cy+dy;
+      if (nx<0||nx>=N||ny<0||ny>=N) continue;
+      const ni = idx(nx,ny);
+      if (mask[ni]===1 || closed[ni]) continue;
+
+      const moveCost = Math.hypot(dx,dy);
+      const dObs = distanceFromField(nx,ny,distField);
+      const obsPen = zonePenalty(dObs, PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale);
+      const dUav = distanceFromField(nx,ny,uavDistField);
+      const uavPen = uavZonePenalty(dUav, PARAMS.safeDist, PARAMS.uavWarningDist, PARAMS.uavPenaltyScale);
+      const dBound = Math.min(nx, N-1-nx, ny, N-1-ny);
+      const boundPen = boundaryZonePenalty(dBound, PARAMS.boundaryDangerDist, PARAMS.boundaryWarningDist, PARAMS.boundaryPenaltyScale);
+
+      const stepCost = moveCost + PARAMS.penaltyWeight*obsPen + PARAMS.uavPenaltyWeight*uavPen + PARAMS.boundaryPenaltyWeight*boundPen;
+      const tentativeG = gCost[idx(cx,cy)] + stepCost;
+
+      if (tentativeG < gCost[ni]){
+        parentX[ni] = cx; parentY[ni] = cy;
+        gCost[ni] = tentativeG;
+        const hCost = Math.hypot(nx-goal[0], ny-goal[1]);
+        let priority;
+        if (algorithm === 'astar') priority = tentativeG + hCost;
+        else if (algorithm === 'dijkstra') priority = tentativeG;
+        else priority = hCost; // greedy best-first
+        heap.push({ x:nx, y:ny, p:priority });
+      }
+    }
+  }
+
+  if (!goalReached) return null;
+
+  // reconstruct
+  const raw = [];
+  let x = goal[0], y = goal[1];
+  while (!(x===start[0] && y===start[1])){
+    raw.push([x,y]);
+    const px = parentX[idx(x,y)], py = parentY[idx(x,y)];
+    x = px; y = py;
+  }
+  raw.push([start[0], start[1]]);
+  raw.reverse();
+
+  return { path: simplifyCollinear(raw), expansions };
+}
+
+function simplifyCollinear(path){
+  if (path.length <= 2) return path.slice();
+  const out = [path[0]];
+  for (let i = 1; i < path.length - 1; i++){
+    const prev = out[out.length-1], cur = path[i], next = path[i+1];
+    const d1x = Math.sign(cur[0]-prev[0]), d1y = Math.sign(cur[1]-prev[1]);
+    const d2x = Math.sign(next[0]-cur[0]), d2y = Math.sign(next[1]-cur[1]);
+    if (d1x !== d2x || d1y !== d2y) out.push(cur);
+  }
+  out.push(path[path.length-1]);
+  return out;
+}
+
+function pathLength(path){
+  let L = 0;
+  for (let i=1;i<path.length;i++) L += Math.hypot(path[i][0]-path[i-1][0], path[i][1]-path[i-1][1]);
+  return L;
+}
+
+/* weighted cost — computed identically regardless of which algorithm found the path,
+   so Cost is a fair, apples-to-apples comparison across algorithms */
+function pathWeightedCost(path, otherPaths){
+  let obsPen = 0, uavPen = 0, boundPen = 0;
+  const otherDense = otherPaths.map(p => densify(p, 6));
+  for (let i=1;i<path.length;i++){
+    const p1=path[i-1], p2=path[i];
+    const n = Math.max(Math.round(Math.max(Math.abs(p2[0]-p1[0]), Math.abs(p2[1]-p1[1]))), 1);
+    for (let k=0;k<=n;k++){
+      const t = k/n;
+      const xs = p1[0] + t*(p2[0]-p1[0]), ys = p1[1] + t*(p2[1]-p1[1]);
+      obsPen += zonePenalty(distanceFromField(xs,ys,state.distField), PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale);
+      const dB = Math.min(xs, GRID-1-xs, ys, GRID-1-ys);
+      boundPen += boundaryZonePenalty(dB, PARAMS.boundaryDangerDist, PARAMS.boundaryWarningDist, PARAMS.boundaryPenaltyScale);
+      let bestD = Infinity;
+      for (const dp of otherDense){
+        for (const pt of dp){
+          const d = Math.hypot(pt[0]-xs, pt[1]-ys);
+          if (d < bestD) bestD = d;
+        }
+      }
+      if (otherDense.length) uavPen += uavZonePenalty(bestD, PARAMS.safeDist, PARAMS.uavWarningDist, PARAMS.uavPenaltyScale);
+    }
+  }
+  return pathLength(path) + PARAMS.penaltyWeight*obsPen + PARAMS.uavPenaltyWeight*uavPen + PARAMS.boundaryPenaltyWeight*boundPen;
+}
+
+function densify(path, stepsPerSeg){
+  const out = [path[0]];
+  for (let i=1;i<path.length;i++){
+    const p1=path[i-1], p2=path[i];
+    for (let k=1;k<=stepsPerSeg;k++){
+      const t = k/stepsPerSeg;
+      out.push([p1[0]+t*(p2[0]-p1[0]), p1[1]+t*(p2[1]-p1[1])]);
+    }
+  }
+  return out;
+}
+
+/* =========================================================
+   RRT & QGA PLANNERS
+   ========================================================= */
+
+/* line-segment feasibility, sampled every ~1 grid unit — used by both
+   RRT (per-edge hard gate) and QGA (per-individual hard gate), and by
+   validateFleet() below, since neither planner's waypoints sit on the
+   8-connected grid graph the way A-star, Dijkstra and Greedy's do. */
+function isObstacleFreeSegment(p1, p2, mask){
+  const dist = Math.hypot(p2[0]-p1[0], p2[1]-p1[1]);
+  const steps = Math.max(1, Math.ceil(dist));
+  for (let s=0; s<=steps; s++){
+    const t = s/steps;
+    const x = p1[0] + t*(p2[0]-p1[0]);
+    const y = p1[1] + t*(p2[1]-p1[1]);
+    const xi = clamp(Math.round(x), 0, GRID-1);
+    const yi = clamp(Math.round(y), 0, GRID-1);
+    if (mask[idx(xi,yi)] === 1) return false;
+  }
+  return true;
+}
+
+function isUAVSafeSegment(p1, p2, uavDistField, safeDist){
+  const dist = Math.hypot(p2[0]-p1[0], p2[1]-p1[1]);
+  const steps = Math.max(1, Math.ceil(dist));
+  for (let s=0; s<=steps; s++){
+    const t = s/steps;
+    const x = p1[0] + t*(p2[0]-p1[0]);
+    const y = p1[1] + t*(p2[1]-p1[1]);
+    if (distanceFromField(x, y, uavDistField) < safeDist) return false;
+  }
+  return true;
+}
+
+function isPathObstacleFree(path, mask){
+  for (let i=1; i<path.length; i++) if (!isObstacleFreeSegment(path[i-1], path[i], mask)) return false;
+  return true;
+}
+
+/* RRT's hard per-edge gate: obstacle-free AND safeDist clear of every
+   already-committed UAV path (mirrors isPathFeasible() in the reference script). */
+function isEdgeFeasibleRRT(p1, p2, mask, uavDistField){
+  return isObstacleFreeSegment(p1, p2, mask) && isUAVSafeSegment(p1, p2, uavDistField, PARAMS.safeDist);
+}
+
+/* single-point combined penalty used only to steer RRT's parent-selection
+   score (score = dTree + lambda*violation) — reuses the exact same
+   zonePenalty/uavZonePenalty/boundaryZonePenalty functions the A* family
+   already uses, so "penalty" means the same thing everywhere in this app. */
+function nodeViolation(pt, distField, uavDistField){
+  const dObs = distanceFromField(pt[0], pt[1], distField);
+  const vObs = zonePenalty(dObs, PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale);
+  const dUav = distanceFromField(pt[0], pt[1], uavDistField);
+  const vUav = uavZonePenalty(dUav, PARAMS.safeDist, PARAMS.uavWarningDist, PARAMS.uavPenaltyScale);
+  const dBound = Math.min(pt[0], GRID-1-pt[0], pt[1], GRID-1-pt[1]);
+  const vBound = boundaryZonePenalty(dBound, PARAMS.boundaryDangerDist, PARAMS.boundaryWarningDist, PARAMS.boundaryPenaltyScale);
+  return vObs + vUav + vBound;
+}
+
+/* cheap fitness used only inside QGA's inner generational loop — samples
+   each segment at a capped density against the precomputed distance
+   fields instead of re-scanning every committed UAV point-by-point.
+   The fair, apples-to-apples Cost shown in the results table is still
+   computed afterwards with the shared pathWeightedCost(). */
+function fastPathCost(path, distField, uavDistField){
+  let length = 0, obsPen = 0, uavPen = 0, boundPen = 0;
+  for (let i=1; i<path.length; i++){
+    const p1 = path[i-1], p2 = path[i];
+    const segLen = Math.hypot(p2[0]-p1[0], p2[1]-p1[1]);
+    length += segLen;
+    const steps = Math.min(20, Math.max(1, Math.round(segLen/2)));
+    for (let k=0; k<=steps; k++){
+      const t = k/steps;
+      const x = p1[0] + t*(p2[0]-p1[0]);
+      const y = p1[1] + t*(p2[1]-p1[1]);
+      obsPen += zonePenalty(distanceFromField(x,y,distField), PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale);
+      uavPen += uavZonePenalty(distanceFromField(x,y,uavDistField), PARAMS.safeDist, PARAMS.uavWarningDist, PARAMS.uavPenaltyScale);
+      const dB = Math.min(x, GRID-1-x, y, GRID-1-y);
+      boundPen += boundaryZonePenalty(dB, PARAMS.boundaryDangerDist, PARAMS.boundaryWarningDist, PARAMS.boundaryPenaltyScale);
+    }
+  }
+  return length + PARAMS.penaltyWeight*obsPen + PARAMS.uavPenaltyWeight*uavPen + PARAMS.boundaryPenaltyWeight*boundPen;
+}
+
+/* ---- RRT: penalty-scored Rapidly-exploring Random Tree ----
+   Instead of always extending from the raw-nearest tree node, every
+   existing node k is scored as score = dTree + lambda*violation, and the
+   LOWEST-scoring node is chosen as the parent — so the tree preferentially
+   grows from nodes that are already sitting in comfortable airspace, not
+   just whichever node happens to be geometrically closest. Every new edge
+   is a hard gate (obstacle-free + safeDist clear of committed UAVs) or
+   it's discarded outright; a node landing deep in an obstacle's Danger
+   Zone (penalty > 0.8) is also rejected as a soft safety margin. */
+function runRRT(start, goal, mask, distField, uavDistField){
+  const stepSize = PARAMS.rrtStepSize, maxIter = PARAMS.rrtMaxIter;
+  const goalRadius = PARAMS.rrtGoalRadius, goalBias = PARAMS.rrtGoalBias, lambda = PARAMS.rrtLambda;
+
+  const tree = [{ x:start[0], y:start[1], parent:-1 }];
+  let goalIdx = -1;
+
+  for (let iter=0; iter<maxIter; iter++){
+    const randPoint = (Math.random() < goalBias) ? goal : [randInt(0,GRID-1), randInt(0,GRID-1)];
+
+    let bestScore = Infinity, nearestIdx = 0;
+    for (let k=0; k<tree.length; k++){
+      const node = tree[k];
+      const dTree = Math.hypot(node.x-randPoint[0], node.y-randPoint[1]);
+      const violation = nodeViolation([node.x,node.y], distField, uavDistField);
+      const score = dTree + lambda*violation;
+      if (score < bestScore){ bestScore = score; nearestIdx = k; }
+    }
+
+    const nearest = tree[nearestIdx];
+    const theta = Math.atan2(randPoint[1]-nearest.y, randPoint[0]-nearest.x);
+    const newPoint = [nearest.x + stepSize*Math.cos(theta), nearest.y + stepSize*Math.sin(theta)];
+    if (newPoint[0]<0 || newPoint[0]>GRID-1 || newPoint[1]<0 || newPoint[1]>GRID-1) continue;
+
+    if (!isEdgeFeasibleRRT([nearest.x,nearest.y], newPoint, mask, uavDistField)) continue;
+
+    const dObs = distanceFromField(newPoint[0], newPoint[1], distField);
+    if (zonePenalty(dObs, PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale) > 0.8) continue;
+
+    tree.push({ x:newPoint[0], y:newPoint[1], parent:nearestIdx });
+    const newIdx = tree.length - 1;
+
+    if (Math.hypot(newPoint[0]-goal[0], newPoint[1]-goal[1]) < goalRadius &&
+        isEdgeFeasibleRRT(newPoint, goal, mask, uavDistField)){
+      tree.push({ x:goal[0], y:goal[1], parent:newIdx });
+      goalIdx = tree.length - 1;
+      break;
+    }
+  }
+
+  if (goalIdx === -1) return null; // tree never reached the goal within maxIter
+
+  const raw = [];
+  let ci = goalIdx;
+  while (ci !== -1){ raw.push([tree[ci].x, tree[ci].y]); ci = tree[ci].parent; }
+  raw.reverse();
+
+  return { path: raw, expansions: tree.length };
+}
+
+/* ---- QGA: Quantum Genetic Algorithm ----
+   Each individual is a row of qubit rotation angles theta in [0,pi/2],
+   two per intermediate waypoint, decoded as
+     x = sin(theta_x)^2 * (GRID-1),  y = sin(theta_y)^2 * (GRID-1)
+   and evolved every generation with a quantum rotation gate that nudges
+   every qubit toward the best-so-far individual's angle, a small-
+   probability quantum NOT-gate mutation (theta -> pi/2 - theta) for
+   diversity, and elitism. Obstacle-free is a hard constraint on every
+   individual — infeasible candidates are scored Infinity and can never
+   become (or drag the population toward) the global best. UAV-to-UAV
+   separation is only a soft term inside the fitness; keeping UAVs apart
+   in time is left to the post-processing wait strategy that already
+   runs after every algorithm. */
+function runQGA(start, goal, mask, distField, uavDistField){
+  const numWaypoints = PARAMS.qgaWaypoints, nVar = numWaypoints * 2;
+  const popSize = PARAMS.qgaPopSize, maxGen = PARAMS.qgaMaxGen;
+  const rotAngle0 = PARAMS.qgaRotAngle0, mutRate = PARAMS.qgaMutRate;
+  const maxInitAttempts = 1500;
+
+  function decode(thetaRow){
+    const wp = [];
+    for (let k=0; k<numWaypoints; k++){
+      const tx = thetaRow[k*2], ty = thetaRow[k*2+1];
+      wp.push([ Math.sin(tx)**2 * (GRID-1), Math.sin(ty)**2 * (GRID-1) ]);
+    }
+    return [start, ...wp, goal];
+  }
+  function randTheta(){
+    const t = new Float64Array(nVar);
+    for (let i=0; i<nVar; i++) t[i] = Math.random() * (Math.PI/2);
+    return t;
+  }
+  function generateFeasible(){
+    for (let a=0; a<maxInitAttempts; a++){
+      const t = randTheta();
+      if (isPathObstacleFree(decode(t), mask)) return t;
+    }
+    return randTheta(); // environment may be too congested — fall back rather than hang
+  }
+
+  const theta = [];
+  for (let i=0; i<popSize; i++) theta.push(generateFeasible());
+
+  let globalBestFit = Infinity, globalBestTheta = theta[0], globalBestPath = decode(theta[0]);
+
+  for (let gen=0; gen<maxGen; gen++){
+    const fitness = new Array(popSize).fill(Infinity);
+    const paths = new Array(popSize);
+
+    for (let i=0; i<popSize; i++){
+      const path = decode(theta[i]);
+      paths[i] = path;
+      if (isPathObstacleFree(path, mask)) fitness[i] = fastPathCost(path, distField, uavDistField);
+    }
+
+    let bestIdx = 0;
+    for (let i=1; i<popSize; i++) if (fitness[i] < fitness[bestIdx]) bestIdx = i;
+
+    if (fitness[bestIdx] < globalBestFit){
+      globalBestFit = fitness[bestIdx];
+      globalBestTheta = theta[bestIdx].slice();
+      globalBestPath = paths[bestIdx];
+    }
+
+    // Quantum rotation gate — nudge every qubit toward the global best
+    const rotAngle = rotAngle0 * (1 - gen/maxGen);
+    for (let i=0; i<popSize; i++){
+      for (let v=0; v<nVar; v++){
+        const diff = globalBestTheta[v] - theta[i][v];
+        const sign = diff > 0 ? 1 : (diff < 0 ? -1 : 0);
+        theta[i][v] = clamp(theta[i][v] + rotAngle*sign, 0, Math.PI/2);
+      }
+    }
+    // Quantum NOT-gate mutation
+    for (let i=0; i<popSize; i++)
+      for (let v=0; v<nVar; v++)
+        if (Math.random() < mutRate) theta[i][v] = Math.PI/2 - theta[i][v];
+
+    if (bestIdx >= 0) theta[bestIdx] = globalBestTheta.slice(); // elitism
+  }
+
+  if (!isFinite(globalBestFit)) return null; // never found an obstacle-free individual
+
+  return { path: globalBestPath, expansions: popSize*maxGen };
+}
+
+/* =========================================================
+   SHARED CONSTANT-SPEED CLOCK (interp + arc-length resample)
+   ========================================================= */
+function interpolateWithIndex(path, stepsPerSeg){
+  const pts = [path[0]], insertIdx = [0];
+  for (let i=1;i<path.length;i++){
+    const p1=path[i-1], p2=path[i];
+    for (let k=1;k<=stepsPerSeg;k++){
+      const t = k/stepsPerSeg;
+      pts.push([p1[0]+t*(p2[0]-p1[0]), p1[1]+t*(p2[1]-p1[1])]);
+      insertIdx.push(i);
+    }
+  }
+  return { pts, insertIdx };
+}
+
+function resampleArcLength(dense, insertIdx, stepSize){
+  if (dense.length < 2) return { pts: dense.slice(), idx: insertIdx ? insertIdx.slice() : null };
+  const cum = [0];
+  for (let i=1;i<dense.length;i++) cum.push(cum[i-1] + Math.hypot(dense[i][0]-dense[i-1][0], dense[i][1]-dense[i-1][1]));
+  const total = cum[cum.length-1];
+  if (total < 1e-9) return { pts:[dense[0]], idx: insertIdx?[insertIdx[0]]:null };
+
+  // drop zero-length duplicate cumDist entries (from earlier wait insertions)
+  const kd = [dense[0]], kc = [cum[0]], ki = insertIdx ? [insertIdx[0]] : null;
+  for (let i=1;i<dense.length;i++){
+    if (cum[i] > kc[kc.length-1]){
+      kd.push(dense[i]); kc.push(cum[i]);
+      if (ki) ki.push(insertIdx[i]);
+    }
+  }
+
+  const outPts = [], outIdx = insertIdx ? [] : null;
+  let seg = 0;
+  for (let d = 0; d <= total + 1e-9; d += stepSize){
+    const dd = Math.min(d, total);
+    while (seg < kc.length-2 && kc[seg+1] < dd) seg++;
+    const segLen = kc[seg+1]-kc[seg];
+    const t = segLen > 1e-9 ? (dd-kc[seg])/segLen : 0;
+    outPts.push([ kd[seg][0] + t*(kd[seg+1][0]-kd[seg][0]), kd[seg][1] + t*(kd[seg+1][1]-kd[seg][1]) ]);
+    if (outIdx) outIdx.push(ki[seg]);
+  }
+  if (Math.hypot(outPts[outPts.length-1][0]-kd[kd.length-1][0], outPts[outPts.length-1][1]-kd[kd.length-1][1]) > 1e-6){
+    outPts.push(kd[kd.length-1]);
+    if (outIdx) outIdx.push(ki[ki.length-1]);
+  }
+  return { pts: outPts, idx: outIdx };
+}
+
+function uniformSpeedPath(path){
+  const { pts, insertIdx } = interpolateWithIndex(path, PARAMS.interpStepsPerSeg);
+  return resampleArcLength(pts, insertIdx, PARAMS.uniformSpeed);
+}
+
+function holdAtGoal(pts, targetLen){
+  if (pts.length >= targetLen) return pts;
+  const out = pts.slice();
+  const last = pts[pts.length-1];
+  while (out.length < targetLen) out.push(last);
+  return out;
+}
+
+function insertWaitPoint(path, t){
+  if (t < 1) return path;
+  if (t > path.length-1) t = path.length-1;
+  const out = path.slice(0,t);
+  out.push(path[t-1]);
+  for (let i=t;i<path.length;i++) out.push(path[i]);
+  return out;
+}
+
+/* =========================================================
+   POST-PROCESSING WAIT STRATEGY (UAV-to-UAV timing conflicts)
+   ========================================================= */
+function resolvePairConflicts(pathA, pathB){
+  let hadConflict = false;
+  let guard = 0;
+  let clear = false;
+  while (!clear && guard < 400){
+    guard++;
+    clear = true;
+    const { pts: denseB, insertIdx: idxB } = interpolateWithIndex(pathB, PARAMS.interpStepsPerSeg);
+    const rB = resampleArcLength(denseB, idxB, PARAMS.uniformSpeed);
+    const rA = uniformSpeedPath(pathA);
+
+    const maxLen = Math.max(rA.pts.length, rB.pts.length);
+    const uA = holdAtGoal(rA.pts, maxLen);
+    const uB = holdAtGoal(rB.pts, maxLen);
+    const uIdxB = holdAtGoal(rB.idx, maxLen);
+
+    for (let k=0;k<maxLen;k++){
+      const d = Math.hypot(uA[k][0]-uB[k][0], uA[k][1]-uB[k][1]);
+      if (d < PARAMS.safeDist){
+        pathB = insertWaitPoint(pathB, uIdxB[k]);
+        hadConflict = true; clear = false; break;
+      }
+    }
+  }
+  return { pathB, hadConflict };
+}
+
+function resolveWaitConflicts(UAVs){
+  let sweep = 0, conflictFree = false;
+  let totalWaits = 0;
+  while (!conflictFree && sweep < PARAMS.maxSweeps){
+    sweep++; conflictFree = true;
+    for (let i=0;i<UAVs.length;i++){
+      for (let j=i+1;j<UAVs.length;j++){
+        const before = UAVs[j].path.length;
+        const { pathB, hadConflict } = resolvePairConflicts(UAVs[i].path, UAVs[j].path);
+        UAVs[j].path = pathB;
+        if (hadConflict){ conflictFree = false; totalWaits += (pathB.length - before); }
+      }
+    }
+  }
+  return totalWaits;
+}
+
+function validateFleet(UAVs){
+  for (const u of UAVs){
+    if (!isPathObstacleFree(u.path, state.mask))
+      return { ok:false, msg:`UAV ${u.id} path intersects an obstacle.` };
+  }
+  for (let i=0;i<UAVs.length;i++){
+    for (let j=i+1;j<UAVs.length;j++){
+      const rA = uniformSpeedPath(UAVs[i].path), rB = uniformSpeedPath(UAVs[j].path);
+      const maxLen = Math.max(rA.pts.length, rB.pts.length);
+      const uA = holdAtGoal(rA.pts, maxLen), uB = holdAtGoal(rB.pts, maxLen);
+      for (let k=0;k<maxLen;k++){
+        if (Math.hypot(uA[k][0]-uB[k][0], uA[k][1]-uB[k][1]) < PARAMS.safeDist)
+          return { ok:false, msg:`UAV ${UAVs[i].id} and UAV ${UAVs[j].id} violate the safe separation distance.` };
+      }
+    }
+  }
+  return { ok:true, msg:`All ${UAVs.length} UAV path(s) obstacle-free; every pair maintains ≥ ${PARAMS.safeDist.toFixed(1)} grid-unit separation on the shared playback clock.` };
+}
+
+/* =========================================================
+   MISSION RUNNER
+   ========================================================= */
+function runMission(){
+  runBtn.disabled = true;
+  stopAnimation();
+  clearLog();
+  setStatus('PLANNING', 'busy');
+  resultsWrap.innerHTML = '<div class="empty-state">Planning in progress…</div>';
+
+  setTimeout(() => {
+    try{ executeMission(); }
+    catch(e){ log('FATAL: ' + e.message, 'l-err'); console.error(e); }
+    finally{ runBtn.disabled = false; setStatus('MISSION COMPLETE', 'live'); }
+  }, 30);
+}
+
+function executeMission(){
+  const algorithm = algoSelect.value;
+  const env = envSelect.value;
+  const n = state.numUAVs;
+
+  const tMissionStart = performance.now();
+
+  log(`GRID ${GRID}×${GRID} · ENV=${env.toUpperCase()} · ALGO=${algorithm.toUpperCase()} · FLEET=${n}`);
+
+  const obstacles = genObstacles(env);
+  const mask = rasterize(obstacles);
+  const distField = computeDistField(obstacles);
+  state.obstacles = obstacles; state.mask = mask; state.distField = distField;
+  log(`OBSTACLES PLACED: ${obstacles.length}`);
+
+  const used = [];
+  const UAVs = [];
+  for (let i=0;i<n;i++){
+    const start = generateFreePosition(mask, used, PARAMS.minSep); used.push(start);
+    const goal  = generateFreePosition(mask, used, PARAMS.minSep); used.push(goal);
+    UAVs.push({ id:i+1, start, goal, path:null, color: UAV_COLORS[i % UAV_COLORS.length] });
+  }
+
+  const committedPaths = [];
+  for (let i=0;i<UAVs.length;i++){
+    const u = UAVs[i];
+    log(`PLANNING PATH FOR UAV ${u.id} …`);
+    const t0 = performance.now();
+    const uavDistField = computeUAVDistField(committedPaths);
+    const result = runSearch(algorithm, u.start, u.goal, mask, distField, uavDistField, committedPaths);
+    const t1 = performance.now();
+
+    if (!result){
+      log(`UAV ${u.id}: NO FEASIBLE PATH FOUND — obstacle layout blocks start/goal.`, 'l-err');
+      u.path = [u.start, u.goal]; // fallback so the rest of the UI doesn't break
+      u.length = NaN; u.timeMs = t1-t0; u.cost = NaN;
+      committedPaths.push(u.path);
+      continue;
+    }
+
+    u.path = result.path;
+    u.length = pathLength(u.path);
+    u.timeMs = t1 - t0;
+    u.cost = pathWeightedCost(u.path, committedPaths);
+    committedPaths.push(u.path);
+
+    log(`UAV ${u.id}: LENGTH ${u.length.toFixed(1)} · TIME ${u.timeMs.toFixed(2)}ms · COST ${u.cost.toFixed(2)}`, 'l-uav');
+  }
+
+  log('RESOLVING UAV-UAV TIMING CONFLICTS (POST-PROCESSING WAIT STRATEGY) …');
+  const totalWaits = resolveWaitConflicts(UAVs);
+  log(totalWaits ? `WAITS INSERTED: ${totalWaits}` : 'NO CONFLICTS DETECTED — no waits required.');
+
+  log('VALIDATING FLEET SEPARATION …');
+  const validation = validateFleet(UAVs);
+  log(validation.ok ? 'VALIDATION PASSED.' : ('VALIDATION FAILED: ' + validation.msg), validation.ok ? '' : 'l-warn');
+
+  const tMissionEnd = performance.now();
+  state.computationTimeMs = tMissionEnd - tMissionStart;
+  log(`TOTAL COMPUTATION TIME: ${state.computationTimeMs.toFixed(2)} ms`);
+
+  state.UAVs = UAVs;
+  state.validation = validation;
+
+  renderResults(UAVs, validation, totalWaits);
+  drawStatic();
+  prepareAnimation(UAVs);
+  playBtn.disabled = false; pauseBtn.disabled = false;
+  startAnimation();
+}
+
+/* =========================================================
+   RESULTS PANEL
+   ========================================================= */
+function renderResults(UAVs, validation, totalWaits){
+  const totalLen = UAVs.reduce((s,u)=>s+(u.length||0),0);
+  const totalCost = UAVs.reduce((s,u)=>s+(u.cost||0),0);
+  const totalTime = UAVs.reduce((s,u)=>s+(u.timeMs||0),0);
+
+  let html = '';
+  html += `<div class="stat-grid">
+    <div class="stat"><div class="k">Fleet Size</div><div class="v">${UAVs.length}</div></div>
+    <div class="stat"><div class="k">Total Compute</div><div class="v nominal">${state.computationTimeMs.toFixed(1)} ms</div></div>
+    <div class="stat"><div class="k">Total Path Length</div><div class="v">${totalLen.toFixed(1)} u</div></div>
+    <div class="stat"><div class="k">Total Cost</div><div class="v">${totalCost.toFixed(2)}</div></div>
+    <div class="stat"><div class="k">Planning Time</div><div class="v">${totalTime.toFixed(2)} ms</div></div>
+    <div class="stat"><div class="k">Waits Inserted</div><div class="v ${totalWaits?'warn':''}">${totalWaits}</div></div>
+  </div>`;
+
+  html += `<table class="results"><thead><tr>
+    <th>UAV</th><th>Length</th><th>Time</th><th>Cost</th>
+  </tr></thead><tbody>`;
+  for (const u of UAVs){
+    html += `<tr>
+      <td><span class="uav-chip"><span class="dot2" style="background:${u.color}"></span>UAV ${u.id}</span></td>
+      <td>${isNaN(u.length) ? '—' : u.length.toFixed(1)}</td>
+      <td>${u.timeMs.toFixed(2)} ms</td>
+      <td>${isNaN(u.cost) ? '—' : u.cost.toFixed(2)}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+
+  html += `<div class="validation ${validation.ok?'pass':'fail'}"><span class="b"></span>${validation.ok ? 'FLEET VALIDATED' : 'VALIDATION FAILED'}</div>`;
+  html += `<div class="help" style="margin-top:8px; font-size:11px; color:var(--text-faint); line-height:1.6;">${validation.msg}</div>`;
+
+  resultsWrap.innerHTML = html;
+}
+
+/* =========================================================
+   STATIC MAP RENDER
+   ========================================================= */
+function toPx(v){ return v * CELL; }
+
+function drawStatic(){
+  const ctx = mctx;
+  ctx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+
+  // background grid
+  if (toggleGrid.checked){
+    ctx.strokeStyle = 'rgba(30,44,72,0.5)'; ctx.lineWidth = 1;
+    const step = 10;
+    for (let g=0; g<=GRID; g+=step){
+      ctx.beginPath(); ctx.moveTo(toPx(g)+0.5,0); ctx.lineTo(toPx(g)+0.5,CANVAS_SIZE); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,toPx(g)+0.5); ctx.lineTo(CANVAS_SIZE,toPx(g)+0.5); ctx.stroke();
+    }
+  }
+
+  // boundary hazard inset
+  if (toggleZones.checked){
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle = 'rgba(243,179,76,0.55)'; ctx.lineWidth = 1;
+    const bw = PARAMS.boundaryWarningDist;
+    ctx.strokeRect(toPx(bw), toPx(bw), CANVAS_SIZE - 2*toPx(bw), CANVAS_SIZE - 2*toPx(bw));
+    ctx.strokeStyle = 'rgba(251,91,78,0.55)';
+    const bd = PARAMS.boundaryDangerDist;
+    ctx.strokeRect(toPx(bd), toPx(bd), CANVAS_SIZE - 2*toPx(bd), CANVAS_SIZE - 2*toPx(bd));
+    ctx.setLineDash([]);
+  }
+
+  // obstacles + zone rings
+  for (const o of state.obstacles){
+    const cx = toPx(o.x + o.w/2), cy = toPx(o.y + o.h/2);
+    const baseR = toPx(Math.max(o.w,o.h)/2);
+    if (toggleZones.checked){
+      ctx.setLineDash([5,4]);
+      ctx.strokeStyle = 'rgba(243,179,76,0.4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx,cy, baseR + toPx(PARAMS.warningDist), 0, Math.PI*2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(251,91,78,0.45)';
+      ctx.beginPath(); ctx.arc(cx,cy, baseR + toPx(PARAMS.dangerDist), 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle = '#141F38'; ctx.strokeStyle = '#2C3E63'; ctx.lineWidth = 1;
+    ctx.fillRect(toPx(o.x), toPx(o.y), toPx(o.w), toPx(o.h));
+    ctx.strokeRect(toPx(o.x)+0.5, toPx(o.y)+0.5, toPx(o.w), toPx(o.h));
+  }
+
+  // path lines (static, dim)
+  for (const u of state.UAVs){
+    if (!u.path) continue;
+    ctx.strokeStyle = u.color; ctx.globalAlpha = 0.35; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    u.path.forEach((p,i)=>{ const px=toPx(p[0]), py=toPx(p[1]); i? ctx.lineTo(px,py) : ctx.moveTo(px,py); });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // start/goal markers
+  for (const u of state.UAVs){
+    drawMarker(ctx, toPx(u.start[0]), toPx(u.start[1]), u.color, 'start', u.id);
+    drawMarker(ctx, toPx(u.goal[0]), toPx(u.goal[1]), u.color, 'goal', u.id);
+  }
+}
+
+function drawMarker(ctx, x, y, color, type, id){
+  ctx.save();
+  ctx.fillStyle = color; ctx.strokeStyle = '#05070C'; ctx.lineWidth = 1.5;
+  if (type === 'start'){
+    ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x, y-8); ctx.lineTo(x+7, y+6); ctx.lineTo(x-7, y+6); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  }
+  ctx.fillStyle = '#C9D6EE'; ctx.font = '9px JetBrains Mono, monospace';
+  ctx.fillText('U'+id, x+9, y-8);
+  ctx.restore();
+}
+
+/* =========================================================
+   ANIMATION
+   ========================================================= */
+function prepareAnimation(UAVs){
+  const raw = UAVs.map(u => uniformSpeedPath(u.path).pts);
+  const maxLen = Math.max(...raw.map(p=>p.length));
+  state.animFrames = raw.map(p => holdAtGoal(p, maxLen));
+  state.animLen = maxLen;
+  state.animIndex = 0;
+  state.instantPenalty = new Array(maxLen).fill(0);
+  state.cumPenalty = new Array(maxLen).fill(0);
+}
+
+function stopAnimation(){
+  state.animPlaying = false;
+  if (state.animRAF) cancelAnimationFrame(state.animRAF);
+}
+
+function startAnimation(){
+  if (!state.animFrames) return;
+  state.animPlaying = true;
+  state.animIndex = 0;
+  state.lastFrameTime = performance.now();
+  pauseBtn.textContent = '⏸ Pause';
+  requestAnimationFrame(animStep);
+}
+playBtn.addEventListener('click', startAnimation);
+pauseBtn.addEventListener('click', () => {
+  state.animPlaying = !state.animPlaying;
+  pauseBtn.textContent = state.animPlaying ? '⏸ Pause' : '▶ Resume';
+  if (state.animPlaying){ state.lastFrameTime = performance.now(); requestAnimationFrame(animStep); }
+});
+
+function animStep(now){
+  if (!state.animPlaying) return;
+  const speed = parseFloat(speedRange.value);
+  const intervalMs = 32 / speed;
+  if (now - state.lastFrameTime >= intervalMs){
+    state.lastFrameTime = now;
+    drawFrame(state.animIndex);
+    if (state.animIndex < state.animLen - 1) state.animIndex++;
+    else { state.animPlaying = false; pauseBtn.textContent = '⏸ Pause'; }
+  }
+  if (state.animPlaying) state.animRAF = requestAnimationFrame(animStep);
+}
+
+function drawFrame(f){
+  drawStatic();
+  const ctx = mctx;
+  let framePenalty = 0, minDist = Infinity;
+
+  state.UAVs.forEach((u, i) => {
+    const pos = state.animFrames[i][f];
+    const d = distanceFromField(pos[0], pos[1], state.distField);
+    const pen = zonePenalty(d, PARAMS.dangerDist, PARAMS.warningDist, PARAMS.penaltyScale);
+    framePenalty += pen;
+    if (d < minDist) minDist = d;
+
+    let col = u.color;
+    if (d < PARAMS.dangerDist) col = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim();
+    else if (d < PARAMS.warningDist) col = getComputedStyle(document.documentElement).getPropertyValue('--warn').trim();
+
+    // trail
+    if (toggleTrail.checked){
+      ctx.strokeStyle = u.color; ctx.globalAlpha = 0.7; ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      const start = Math.max(0, f-25);
+      for (let k=start;k<=f;k++){
+        const p = state.animFrames[i][k];
+        const px = toPx(p[0]), py = toPx(p[1]);
+        k===start ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+
+    const px = toPx(pos[0]), py = toPx(pos[1]);
+    ctx.save();
+    ctx.shadowColor = col; ctx.shadowBlur = 10;
+    ctx.fillStyle = col; ctx.strokeStyle = '#05070C'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.rect(px-5,py-5,10,10); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  });
+
+  const prevCum = f>0 ? state.cumPenalty[f-1] : 0;
+  state.instantPenalty[f] = framePenalty;
+  state.cumPenalty[f] = prevCum + framePenalty;
+
+  hudDist.textContent = isFinite(minDist) ? minDist.toFixed(1) + ' u' : '—';
+  hudPen.textContent = framePenalty.toFixed(2);
+  hudCum.textContent = state.cumPenalty[f].toFixed(1);
+
+  drawChart(f);
+}
+
+/* =========================================================
+   LIVE PENALTY CHART
+   ========================================================= */
+function drawChart(uptoFrame){
+  const ctx = cctx;
+  const w = chartCanvas.width, h = chartCanvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  const inst = state.instantPenalty.slice(0, uptoFrame+1);
+  const cum = state.cumPenalty.slice(0, uptoFrame+1);
+  if (!inst.length) return;
+
+  const maxCum = Math.max(1, ...cum);
+  const n = state.animLen;
+
+  ctx.strokeStyle = 'rgba(30,44,72,0.6)'; ctx.lineWidth = 1;
+  for (let gy=0; gy<=4; gy++){
+    const y = h - (gy/4)*(h-20) - 10;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+  }
+
+  function plot(arr, maxV, color, fill){
+    ctx.beginPath();
+    arr.forEach((v,i)=>{
+      const x = (i/(n-1)) * w;
+      const y = h - (v/maxV)*(h-20) - 10;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    if (fill){
+      ctx.lineTo((arr.length-1)/(n-1)*w, h);
+      ctx.lineTo(0,h); ctx.closePath();
+      ctx.fillStyle = color.replace('1)','0.08)');
+      ctx.fill();
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.stroke();
+  }
+
+  plot(cum, maxCum, 'rgba(243,179,76,1)', true);
+  plot(inst, Math.max(1,...inst), 'rgba(67,229,201,1)', false);
+
+  ctx.fillStyle = 'rgba(67,229,201,1)'; ctx.font = '10px JetBrains Mono, monospace';
+  ctx.fillText('— instantaneous', 10, 14);
+  ctx.fillStyle = 'rgba(243,179,76,1)';
+  ctx.fillText('— cumulative', 130, 14);
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+runBtn.addEventListener('click', runMission);
+setUavCount(3);
+drawEmptyMap();
+
+function drawEmptyMap(){
+  mctx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+  mctx.fillStyle = 'rgba(127,145,179,0.35)';
+  mctx.font = '12px JetBrains Mono, monospace';
+  mctx.textAlign = 'center';
+  mctx.fillText('AWAITING MISSION PARAMETERS', CANVAS_SIZE/2, CANVAS_SIZE/2);
+  mctx.textAlign = 'left';
+}
+
+})();
+</script>
+</body>
+</html>
